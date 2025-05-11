@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">GEO</string>
+    <string name="title_activity_ntrip">NtripActivity</string>
 </resources>

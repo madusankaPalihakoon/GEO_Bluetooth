@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText android:id="@+id/etCaster"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Caster Host" />
+
+    <EditText android:id="@+id/etPort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Port"
+        android:inputType="number" />
+
+    <EditText android:id="@+id/etMountpoint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Mountpoint" />
+
+    <EditText android:id="@+id/etUsername"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Username" />
+
+    <EditText android:id="@+id/etPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Password"
+        android:inputType="textPassword" />
+
+    <Button android:id="@+id/btnConnectNtrip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Connect to NTRIP" />
+</LinearLayout>
