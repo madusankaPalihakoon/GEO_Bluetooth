@@ -22,7 +22,7 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : AppCompatActivity() {
     private var btPermission = false
     private var bluetoothAdapter: BluetoothAdapter? = null
-    private lateinit var deviceNameText: TextView  // UI element reference
+    private lateinit var deviceNameText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         val bluetoothManager = getSystemService(BluetoothManager::class.java)
         bluetoothAdapter = bluetoothManager?.adapter
 
-        deviceNameText = findViewById(R.id.device_name) // Match with your layout TextView ID
+        deviceNameText = findViewById(R.id.device_name)
     }
 
     fun scanBluetooth(view: View) {
@@ -155,6 +155,8 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private val readBuffer = StringBuilder() // Shared buffer
+
     @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
     private fun connectToDevice(device: BluetoothDevice) {
         Thread {
@@ -182,11 +184,10 @@ class MainActivity : AppCompatActivity() {
                 val buffer = ByteArray(1024)
 
                 while (true) {
-                    // Read incoming data from the Bluetooth device
                     val bytesRead = inputStream.read(buffer)
                     if (bytesRead > 0) {
-                        val incomingData = String(buffer, 0, bytesRead)
-                        println("BT: $incomingData")  // Log the incoming data (to Logcat)
+                        val data = buffer.copyOfRange(0, bytesRead)
+                        onBluetoothDataReceived(data)
                     }
                 }
             } catch (e: Exception) {
@@ -205,6 +206,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun onBluetoothDataReceived(bytes: ByteArray) {
+        val data = String(bytes, Charsets.UTF_8)
+        readBuffer.append(data)
 
+        var endIdx: Int
+        while (true) {
+            endIdx = readBuffer.indexOf("\r\n")
+            if (endIdx == -1) break
 
+            val line = readBuffer.substring(0, endIdx).trim()
+            readBuffer.delete(0, endIdx + 2)
+
+            println("Received NMEA: $line")
+        }
+    }
 }
