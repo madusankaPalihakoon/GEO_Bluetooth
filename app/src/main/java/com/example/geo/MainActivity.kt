@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -43,14 +44,24 @@ class MainActivity : AppCompatActivity() {
     fun scanBluetooth(view: View) {
         if (bluetoothAdapter == null) {
             Toast.makeText(this, "Device doesn't support Bluetooth", Toast.LENGTH_LONG).show()
-        } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-            } else {
-                bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_ADMIN)
-            }
+            return
         }
+
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.BLUETOOTH
+            )
+        }
+
+        bluetoothMultiplePermissionsLauncher.launch(permissions)
     }
+
 
     private val bluetoothPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -69,6 +80,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val bluetoothMultiplePermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            btPermission = true
+            if (bluetoothAdapter?.isEnabled == false) {
+                val enableBTIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                bluetoothActivityResultLauncher.launch(enableBTIntent)
+            } else {
+                btScan()
+            }
+        } else {
+            btPermission = false
+            Toast.makeText(this, "Bluetooth permissions denied", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
     private val bluetoothActivityResultLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result: ActivityResult ->
@@ -77,7 +107,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
     private fun btScan() {
         val builder = AlertDialog.Builder(this)
         val inflater = layoutInflater
@@ -107,8 +137,15 @@ class MainActivity : AppCompatActivity() {
             btList.setOnItemClickListener { _, _, position, _ ->
                 val selectedDevice = data[position]
                 val name = selectedDevice["A"]
-                deviceNameText.text = name
+                val address = selectedDevice["B"]
+
+                deviceNameText.text = "$name\n$address"
                 dialog.dismiss()
+
+                val device = bluetoothAdapter?.getRemoteDevice(address)
+                device?.let {
+                    connectToDevice(it)
+                }
             }
         } else {
             Toast.makeText(this, "No Devices Found", Toast.LENGTH_LONG).show()
@@ -117,5 +154,57 @@ class MainActivity : AppCompatActivity() {
 
         dialog.show()
     }
+
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])
+    private fun connectToDevice(device: BluetoothDevice) {
+        Thread {
+            try {
+                // UUID for SPP (Serial Port Profile)
+                val uuid = device.uuids?.firstOrNull()?.uuid
+                    ?: java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+                // Create the RFCOMM socket
+                val socket = device.createRfcommSocketToServiceRecord(uuid)
+
+                // Cancel Bluetooth discovery to improve connection performance
+                bluetoothAdapter?.cancelDiscovery()
+
+                // Connect to the Bluetooth device
+                socket.connect()
+
+                runOnUiThread {
+                    // Notify the user that the connection was successful
+                    Toast.makeText(this, "Connected to ${device.name}", Toast.LENGTH_SHORT).show()
+                }
+
+                // Set up input stream for receiving data
+                val inputStream = socket.inputStream
+                val buffer = ByteArray(1024)
+
+                while (true) {
+                    // Read incoming data from the Bluetooth device
+                    val bytesRead = inputStream.read(buffer)
+                    if (bytesRead > 0) {
+                        val incomingData = String(buffer, 0, bytesRead)
+                        println("BT: $incomingData")  // Log the incoming data (to Logcat)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                runOnUiThread {
+                    // You can show a Toast or log the error message here if needed
+                    println("Connection failed: ${e.message}")
+                }
+            }
+        }.start()
+
+        // If permissions are granted for Android 12 and above, cancel discovery
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+            bluetoothAdapter?.cancelDiscovery()
+        }
+    }
+
+
 
 }
